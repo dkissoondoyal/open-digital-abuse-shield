@@ -18,11 +18,25 @@ def verify_dkim_signatures(message: bytes, dns_txt_lookup, *, max_signatures=10)
         raise ValueError("DNS callback required")
     if type(max_signatures) is not int or not 1 <= max_signatures <= 20:
         raise ValueError("Invalid signature limit")
-    if b"\r\n\r\n" not in message:\n        return {"method": "dkim", "status": "indeterminate",\n                "reason": "missing-header-body-separator", "decision": "no-blocking-decision"}\n    header = message.split(b"\r\n\r\n", 1)[0]
-    if b"\n" in header.replace(b"\r\n", b""):
+    if b"\r
+\r
+" not in message:
+        return {"method": "dkim", "status": "indeterminate",
+                "reason": "missing-header-body-separator", "decision": "no-blocking-decision"}
+    header = message.split(b"\r
+\r
+", 1)[0]
+    if b"
+" in header.replace(b"\r
+", b""):
         raise ValueError("Non-CRLF header format")
     # Only header section is parsed; no message body is logged or returned.
-    parsed = BytesHeaderParser(policy=default).parsebytes(header + b"\r\n\r\n")\n    if parsed.defects or any(getattr(v, "defects", ()) for v in parsed.values()):\n        return {"method": "dkim", "status": "indeterminate",\n                "reason": "malformed-headers", "decision": "no-blocking-decision"}
+    parsed = BytesHeaderParser(policy=default).parsebytes(header + b"\r
+\r
+")
+    if parsed.defects or any(getattr(v, "defects", ()) for v in parsed.values()):
+        return {"method": "dkim", "status": "indeterminate",
+                "reason": "malformed-headers", "decision": "no-blocking-decision"}
     values = parsed.get_all("DKIM-Signature", [])
     if len(values) > max_signatures:
         return {"method": "dkim", "status": "indeterminate",
@@ -40,7 +54,14 @@ def verify_dkim_signatures(message: bytes, dns_txt_lookup, *, max_signatures=10)
         def lookup(name, **kwargs):
             nonlocal dns_error
             try:
-                if not isinstance(name, bytes) or not 0 < len(name) <= 255:\n                    dns_error = True\n                    raise ValueError("Invalid DNS lookup name")\n                value = dns_txt_lookup(name)\n                if value is not None and (not isinstance(value, bytes) or len(value) > 65535):\n                    dns_error = True\n                    raise ValueError("Invalid DNS TXT result")\n                return value
+                if not isinstance(name, bytes) or not 0 < len(name) <= 255:
+                    dns_error = True
+                    raise ValueError("Invalid DNS lookup name")
+                value = dns_txt_lookup(name)
+                if value is not None and (not isinstance(value, bytes) or len(value) > 65535):
+                    dns_error = True
+                    raise ValueError("Invalid DNS TXT result")
+                return value
             except Exception:
                 dns_error = True
                 raise
