@@ -8,6 +8,7 @@ import base64
 import unittest
 
 from odas.dkim_verify import verify_dkim
+from odas.dkim_multi import verify_dkim_signatures
 
 try:
     import dkim
@@ -39,6 +40,30 @@ class RealDKIMTests(unittest.TestCase):
         signature = dkim.sign(cls.message, b"test", b"example.org",
                               cls.private_pem, include_headers=[b"from", b"to", b"subject", b"date"])
         cls.signed = signature + cls.message
+
+    def test_real_multiple_signatures(self):
+        second = dkim.sign(self.signed, b"second", b"example.org",
+                           self.private_pem,
+                           include_headers=[b"from", b"to", b"subject", b"date"])
+        double_signed = second + self.signed
+        result = verify_dkim_signatures(double_signed, lambda _: self.dns_record)
+        self.assertEqual(result["status"], "pass", result)
+        self.assertEqual(len(result["signatures"]), 2, result)
+        self.assertEqual([x["status"] for x in result["signatures"]],
+                         ["pass", "pass"], result)
+        self.assertEqual(result["decision"], "no-blocking-decision")
+
+    def test_real_multiple_signatures_one_invalid(self):
+        second = dkim.sign(self.signed, b"second", b"example.org",
+                           self.private_pem,
+                           include_headers=[b"from", b"to", b"subject", b"date"])
+        double_signed = second + self.signed
+        # Tamper with the first signature only; the second remains intact.
+        altered = double_signed.replace(b"b=", b"b=AAAA", 1)
+        result = verify_dkim_signatures(altered, lambda _: self.dns_record)
+        self.assertEqual(len(result["signatures"]), 2, result)
+        self.assertIn("pass", [x["status"] for x in result["signatures"]], result)
+        self.assertEqual(result["decision"], "no-blocking-decision")
 
     def test_real_valid_signature(self):
         result = verify_dkim(self.signed, lambda _: self.dns_record)
