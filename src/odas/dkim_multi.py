@@ -18,22 +18,14 @@ def verify_dkim_signatures(message: bytes, dns_txt_lookup, *, max_signatures=10)
         raise ValueError("DNS callback required")
     if type(max_signatures) is not int or not 1 <= max_signatures <= 20:
         raise ValueError("Invalid signature limit")
-    if b"\r
-\r
-" not in message:
+    if b"\r\n\r\n" not in message:
         return {"method": "dkim", "status": "indeterminate",
                 "reason": "missing-header-body-separator", "decision": "no-blocking-decision"}
-    header = message.split(b"\r
-\r
-", 1)[0]
-    if b"
-" in header.replace(b"\r
-", b""):
+    header = message.split(b"\r\n\r\n", 1)[0]
+    if b"\n" in header.replace(b"\r\n", b""):
         raise ValueError("Non-CRLF header format")
     # Only header section is parsed; no message body is logged or returned.
-    parsed = BytesHeaderParser(policy=default).parsebytes(header + b"\r
-\r
-")
+    parsed = BytesHeaderParser(policy=default).parsebytes(header + b"\r\n\r\n")
     if parsed.defects or any(getattr(v, "defects", ()) for v in parsed.values()):
         return {"method": "dkim", "status": "indeterminate",
                 "reason": "malformed-headers", "decision": "no-blocking-decision"}
