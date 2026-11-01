@@ -37,12 +37,25 @@ def verify_dkim(message: bytes, dns_txt_lookup: Callable, *, timeout_seconds=5):
             raise ValueError("Invalid DNS TXT result")
         return value
 
+    dns_uncertain = False
+
+    def tracked_lookup(name, **kwargs):
+        nonlocal dns_uncertain
+        try:
+            return lookup(name, **kwargs)
+        except Exception:
+            dns_uncertain = True
+            raise
+
     try:
-        verified = bool(dkim.verify(message, dnsfunc=lookup, timeout=timeout_seconds))
+        verified = bool(dkim.verify(message, dnsfunc=tracked_lookup, timeout=timeout_seconds))
     except Exception as exc:
         # Preserve uncertainty; do not convert DNS errors to definitive failures.
         return {"status": "indeterminate", "method": "dkim",
                 "reason": type(exc).__name__, "decision": "no-blocking-decision"}
+    if dns_uncertain:
+        return {"status": "indeterminate", "method": "dkim",
+                "reason": "dns-lookup-error", "decision": "no-blocking-decision"}
     return {"status": "pass" if verified else "fail", "method": "dkim",
             "decision": "no-blocking-decision",
             "caution": "DKIM outcome alone is neither proof of safety nor proof of abuse"}
