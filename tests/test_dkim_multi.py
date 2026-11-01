@@ -41,7 +41,7 @@ class MultipleSignatureTests(unittest.TestCase):
                     dnsfunc(b"test._domainkey.example.org")
                 except TimeoutError:
                     return False
-        with patch("dkim.DKIM", FakeDKIM):
+        with patch.dict(sys.modules, {"dkim": types.SimpleNamespace(DKIM=FakeDKIM)}):
             r = verify_dkim_signatures(message, lambda _: (_ for _ in ()).throw(TimeoutError()))
         self.assertEqual(r["signatures"][0]["status"], "indeterminate")
 
