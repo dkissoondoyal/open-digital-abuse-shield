@@ -6,6 +6,7 @@ resolver callback, which must enforce its own DNSSEC/transport/cache policy.
 DKIM pass is NOT proof that a message is safe, and fail is NOT proof of abuse.
 """
 from collections.abc import Callable
+from odas.dns_budget import bounded_dns_txt_lookup
 
 MAX_MESSAGE_BYTES = 256000
 
@@ -32,11 +33,12 @@ def verify_dkim(message: bytes, dns_txt_lookup: Callable, *, timeout_seconds=5):
     def lookup(name, **_kwargs):
         if not isinstance(name, bytes) or len(name) > 255:
             raise ValueError("Invalid DNS lookup name")
-        value = dns_txt_lookup(name)
+        value = bounded_lookup(name)
         if value is not None and (not isinstance(value, bytes) or len(value) > 65535):
             raise ValueError("Invalid DNS TXT result")
         return value
 
+    bounded_lookup = bounded_dns_txt_lookup(dns_txt_lookup)
     dns_uncertain = False
 
     def tracked_lookup(name, **kwargs):
