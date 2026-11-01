@@ -18,7 +18,6 @@ def verify_dkim_signatures(message: bytes, dns_txt_lookup, *, max_signatures=10)
         raise ValueError("DNS callback required")
     if type(max_signatures) is not int or not 1 <= max_signatures <= 20:
         raise ValueError("Invalid signature limit")
-    import dkim
     header = message.split(b"\r\n\r\n", 1)[0]
     if b"\n" in header.replace(b"\r\n", b""):
         raise ValueError("Non-CRLF header format")
@@ -28,6 +27,13 @@ def verify_dkim_signatures(message: bytes, dns_txt_lookup, *, max_signatures=10)
     if len(values) > max_signatures:
         return {"method": "dkim", "status": "indeterminate",
                 "reason": "signature-limit-exceeded", "decision": "no-blocking-decision"}
+    if not values:
+        return {"method": "dkim", "signatures": [], "status": "indeterminate",
+                "decision": "no-blocking-decision", "warning": "No DKIM signatures"}
+    try:
+        import dkim
+    except ImportError as exc:
+        raise RuntimeError("Optional dkimpy dependency is not installed") from exc
     observations = []
     for index, value in enumerate(values):
         dns_error = False
