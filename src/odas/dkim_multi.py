@@ -25,11 +25,20 @@ def verify_dkim_signatures(message: bytes, dns_txt_lookup, *, max_signatures=10)
     header = message.split(b"\r\n\r\n", 1)[0]
     if b"\n" in header.replace(b"\r\n", b""):
         raise ValueError("Non-CRLF header format")
+    if len(header) > 65536:
+        return {"method": "dkim", "status": "indeterminate",
+                "reason": "header-size-limit-exceeded", "decision": "no-blocking-decision"}
+    if b"\r" in header.replace(b"\r\n", b""):
+        return {"method": "dkim", "status": "indeterminate",
+                "reason": "malformed-headers", "decision": "no-blocking-decision"}
     # Only header section is parsed; no message body is logged or returned.
     parsed = BytesHeaderParser(policy=default).parsebytes(header + b"\r\n\r\n")
     if parsed.defects or any(getattr(v, "defects", ()) for v in parsed.values()):
         return {"method": "dkim", "status": "indeterminate",
                 "reason": "malformed-headers", "decision": "no-blocking-decision"}
+    if len(parsed.get_all("From", [])) > 1:
+        return {"method": "dkim", "status": "indeterminate",
+                "reason": "duplicate-from-header", "decision": "no-blocking-decision"}
     values = parsed.get_all("DKIM-Signature", [])
     if len(values) > max_signatures:
         return {"method": "dkim", "status": "indeterminate",
