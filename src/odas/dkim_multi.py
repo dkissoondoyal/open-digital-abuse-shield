@@ -8,7 +8,8 @@ from email.parser import BytesHeaderParser
 from email.policy import default
 import re
 
-from odas.dkim_verify import verify_dkim, MAX_MESSAGE_BYTES
+from odas.dkim_verify import MAX_MESSAGE_BYTES
+from odas.dns_budget import bounded_dns_txt_lookup
 
 
 def verify_dkim_signatures(message: bytes, dns_txt_lookup, *, max_signatures=10):
@@ -40,6 +41,7 @@ def verify_dkim_signatures(message: bytes, dns_txt_lookup, *, max_signatures=10)
         import dkim
     except ImportError as exc:
         raise RuntimeError("Optional dkimpy dependency is not installed") from exc
+    bounded_lookup = bounded_dns_txt_lookup(dns_txt_lookup)
     observations = []
     for index, value in enumerate(values):
         dns_error = False
@@ -49,7 +51,7 @@ def verify_dkim_signatures(message: bytes, dns_txt_lookup, *, max_signatures=10)
                 if not isinstance(name, bytes) or not 0 < len(name) <= 255:
                     dns_error = True
                     raise ValueError("Invalid DNS lookup name")
-                value = dns_txt_lookup(name)
+                value = bounded_lookup(name)
                 if value is not None and (not isinstance(value, bytes) or len(value) > 65535):
                     dns_error = True
                     raise ValueError("Invalid DNS TXT result")
