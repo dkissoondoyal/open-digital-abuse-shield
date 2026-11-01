@@ -1,5 +1,7 @@
 import unittest
 from unittest.mock import patch
+import sys
+import types
 from odas.dkim_multi import verify_dkim_signatures
 
 
@@ -23,7 +25,7 @@ class MultipleSignatureTests(unittest.TestCase):
                 pass
             def verify(self, *, idx, dnsfunc):
                 return idx == 0
-        with patch("dkim.DKIM", FakeDKIM):
+        with patch.dict(sys.modules, {"dkim": types.SimpleNamespace(DKIM=FakeDKIM)}):
             r = verify_dkim_signatures(message, lambda _: None)
         self.assertEqual(r["status"], "pass")
         self.assertEqual(r["signatures"][0]["signing_domain"], "example.org")
