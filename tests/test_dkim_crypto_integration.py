@@ -60,6 +60,20 @@ class RealDKIMTests(unittest.TestCase):
         result = verify_dkim(self.signed, lambda _: wrong_record)
         self.assertEqual(result["status"], "fail", result)
 
+    def test_dns_callback_error_is_indeterminate_even_if_library_returns_false(self):
+        # Some verifier libraries may catch a DNS callback error and return False.
+        # Our adapter must still report uncertainty, not a definitive fail.
+        from unittest.mock import patch
+        def swallowed_error(message, dnsfunc, **kwargs):
+            try:
+                dnsfunc(b"test._domainkey.example.org")
+            except TimeoutError:
+                return False
+            return True
+        with patch.object(dkim, "verify", swallowed_error):
+            result = verify_dkim(self.signed, lambda _: (_ for _ in ()).throw(TimeoutError()))
+        self.assertEqual(result["status"], "indeterminate", result)
+
     def test_dns_error_is_indeterminate(self):
         def timeout(_):
             raise TimeoutError("simulated DNS outage")
