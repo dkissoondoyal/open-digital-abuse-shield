@@ -1,0 +1,6 @@
+From: Alice <alice@example.org>
+To: Bob <bob@example.net>
+Subject: Sample demonstration
+Date: Sun, 01 Nov 2026 07:30:00 +0400
+Message-ID: <sample@example.org>
+
