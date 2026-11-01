@@ -75,9 +75,13 @@ def verify_dkim_signatures(message: bytes, dns_txt_lookup, *, max_signatures=10)
             status = "indeterminate"
         item = {"index": index, "status": status}
         if status == "pass":
-            match = re.search(r"(?:^|;)\s*d\s*=\s*([A-Za-z0-9_.-]+)\s*(?:;|$)", str(value), re.I)
-            if match:
-                item["signing_domain"] = match.group(1).lower()
+            # Do not publish an ambiguous identity when duplicate d= tags occur.
+            # The cryptographic verdict remains separate from identity reporting.
+            domains = re.findall(r"(?:^|;)\s*d\s*=\s*([^;]*)", str(value), re.I)
+            if len(domains) == 1:
+                domain = domains[0].strip()
+                if re.fullmatch(r"[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)*", domain):
+                    item["signing_domain"] = domain.lower()
         observations.append(item)
     return {"method": "dkim", "signatures": observations,
             "status": ("pass" if any(x["status"] == "pass" for x in observations)
